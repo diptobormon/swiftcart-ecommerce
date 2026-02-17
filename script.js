@@ -1,327 +1,250 @@
 console.log("script connected");
 
-const API_BASE = "https://fakestoreapi.com";
-
 const categoryContainer = document.getElementById("categoryContainer");
 const productGrid = document.getElementById("productGrid");
 const loading = document.getElementById("loading");
 
 const modal = document.getElementById("modal");
-const closeModalBtn = document.getElementById("closeModal");
 const modalContent = document.getElementById("modalContent");
+const closeModal = document.getElementById("closeModal");
 
 const cartCountEl = document.getElementById("cartCount");
 
-let currentProducts = [];
-let activeCategory = null;
+let activeCategory = "all";
+let cart = [];
 
-let cart = loadCartFromStorage();
-updateCartCount();
-
-/* ----------------------------
-   Loading UI
----------------------------- */
-function showLoading() {
-    if (!loading) return;
-    loading.classList.remove("hidden");
-    loading.innerHTML = `
-    <div class="flex items-center gap-3">
-      <div class="h-5 w-5 rounded-full border-2 border-gray-300 border-t-black animate-spin"></div>
-      <p class="text-sm text-gray-600">Loading...</p>
-    </div>
-  `;
+function showLoading(isLoading) {
+    if (isLoading) loading.classList.remove("hidden");
+    else loading.classList.add("hidden");
 }
 
-function hideLoading() {
-    if (!loading) return;
-    loading.classList.add("hidden");
-    loading.innerHTML = "";
-}
-
-/* ----------------------------
-   Categories (Active State)
----------------------------- */
-function setActiveCategory(category) {
-    activeCategory = category;
+function setActiveCategory(cat) {
+    activeCategory = cat;
 
     document.querySelectorAll(".cat-btn").forEach((btn) => {
-        const isActive = btn.dataset.cat === category;
+        const isActive = btn.dataset.cat === cat;
+        btn.classList.toggle("bg-indigo-600", isActive);
+        btn.classList.toggle("text-white", isActive);
+        btn.classList.toggle("border-indigo-600", isActive);
 
-        btn.classList.remove("bg-black", "text-white", "border-black");
-        btn.classList.add("bg-white", "text-black", "border-gray-300");
-
-        if (isActive) {
-            btn.classList.remove("bg-white", "text-black", "border-gray-300");
-            btn.classList.add("bg-black", "text-white", "border-black");
-        }
+        btn.classList.toggle("bg-white", !isActive);
+        btn.classList.toggle("text-slate-700", !isActive);
+        btn.classList.toggle("border-slate-300", !isActive);
     });
 }
 
-/* ----------------------------
-   Render
----------------------------- */
-function productCard(p) {
-    const shortTitle = p.title.length > 35 ? p.title.slice(0, 35) + "..." : p.title;
-    const rate = p.rating?.rate ?? "N/A";
+function updateCartCount() {
+    cartCountEl.textContent = String(cart.length);
+}
 
-    return `
-    <div class="bg-white rounded-xl p-3 shadow flex flex-col">
-      <div class="bg-gray-50 rounded-lg p-2">
-        <img src="${p.image}" alt="${escapeHtml(p.title)}" class="h-40 w-full object-contain" />
-      </div>
+function openModal(html) {
+    modalContent.innerHTML = html;
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+}
 
-      <h3 class="mt-3 text-sm font-semibold leading-5 min-h-[40px]">
-        ${escapeHtml(shortTitle)}
-      </h3>
+function hideModal() {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+}
 
-      <div class="mt-2 flex items-center justify-between">
-        <p class="text-sm font-bold">$${p.price}</p>
-        <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-          ${escapeHtml(p.category)}
-        </span>
-      </div>
+closeModal.addEventListener("click", hideModal);
+modal.addEventListener("click", (e) => {
+    if (e.target === modal) hideModal();
+});
 
-      <p class="text-xs text-gray-600 mt-2">Rating: ${rate}</p>
+async function fetchJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Request failed");
+    return res.json();
+}
 
-      <div class="mt-3 flex gap-2">
+function renderCategories(categories) {
+    const allCats = ["all", ...categories];
+
+    categoryContainer.innerHTML = allCats
+        .map((cat) => {
+            const label = cat === "all" ? "All" : cat;
+            return `
         <button
-          class="details-btn flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
-          data-id="${p.id}">
-          Details
+          class="cat-btn px-5 py-2 rounded-full border text-sm transition"
+          data-cat="${cat}"
+          type="button"
+        >
+          ${label}
         </button>
+      `;
+        })
+        .join("");
 
-        <button
-          class="add-btn flex-1 bg-black text-white rounded-lg px-3 py-2 text-sm hover:opacity-90"
-          data-id="${p.id}">
-          Add to Cart
-        </button>
-      </div>
-    </div>
-  `;
+    setActiveCategory("all");
 }
 
 function renderProducts(products) {
-    currentProducts = products.slice();
-    productGrid.innerHTML = products.map(productCard).join("");
+    productGrid.innerHTML = products
+        .map((p) => {
+            const title = p.title.length > 24 ? p.title.slice(0, 24) + "..." : p.title;
+            const rating = p.rating?.rate ?? "N/A";
+            const count = p.rating?.count ?? 0;
+
+            return `
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition">
+          <div class="bg-slate-100 p-6 flex items-center justify-center h-56">
+            <img src="${p.image}" alt="${p.title}" class="max-h-40 w-auto object-contain" />
+          </div>
+
+          <div class="p-4">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
+                ${p.category}
+              </span>
+
+              <span class="text-sm text-slate-600">
+                <span class="text-amber-500">★</span> ${rating} <span class="text-xs">(${count})</span>
+              </span>
+            </div>
+
+            <h3 class="mt-3 font-semibold text-slate-900 leading-snug">${title}</h3>
+            <p class="mt-2 font-bold text-slate-900">$${p.price}</p>
+
+            <div class="mt-4 flex gap-2">
+              <button
+                class="details-btn flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm hover:bg-slate-100"
+                data-id="${p.id}"
+                type="button"
+              >
+                Details
+              </button>
+
+              <button
+                class="add-btn flex-1 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
+                data-id="${p.id}"
+                type="button"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+        })
+        .join("");
 }
 
-/* ----------------------------
-   Fetch
----------------------------- */
 async function loadCategories() {
-    showLoading();
-
+    showLoading(true);
     try {
-        const res = await fetch(`${API_BASE}/products/categories`);
-        const categories = await res.json();
-
-        categoryContainer.innerHTML = categories
-            .map(
-                (cat) => `
-          <button
-            class="cat-btn px-3 py-1 rounded-full border text-sm bg-white text-black border-gray-300 hover:bg-black hover:text-white"
-            data-cat="${cat}">
-            ${escapeHtml(cat)}
-          </button>
-        `
-            )
-            .join("");
-
-        // Optional: auto-load first category
-        if (categories.length > 0) {
-            setActiveCategory(categories[0]);
-            await handleCategoryClick(categories[0]);
-        }
+        const categories = await fetchJSON("https://fakestoreapi.com/products/categories");
+        renderCategories(categories);
+        await loadProducts("all");
     } catch (err) {
-        categoryContainer.innerHTML = `<p class="text-red-600">Failed to load categories</p>`;
+        categoryContainer.innerHTML = `<p class="text-red-600 text-center w-full">Failed to load categories</p>`;
         console.log(err);
     } finally {
-        hideLoading();
+        showLoading(false);
     }
 }
 
-async function handleCategoryClick(category) {
-    showLoading();
+async function loadProducts(category) {
+    showLoading(true);
     productGrid.innerHTML = "";
 
     try {
-        const url = `${API_BASE}/products/category/${encodeURIComponent(category)}`;
-        const res = await fetch(url);
-        const products = await res.json();
+        const url =
+            category === "all"
+                ? "https://fakestoreapi.com/products"
+                : `https://fakestoreapi.com/products/category/${encodeURIComponent(category)}`;
 
+        const products = await fetchJSON(url);
         renderProducts(products);
     } catch (err) {
         productGrid.innerHTML = `<p class="text-red-600">Failed to load products</p>`;
         console.log(err);
     } finally {
-        hideLoading();
+        showLoading(false);
     }
 }
 
-async function fetchProductById(id) {
-    const res = await fetch(`${API_BASE}/products/${id}`);
-    return res.json();
-}
-
-/* ----------------------------
-   Modal
----------------------------- */
-function openModal() {
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
-}
-
-function closeModal() {
-    modal.classList.add("hidden");
-    modal.classList.remove("flex");
-    modalContent.innerHTML = "";
-}
-
-async function openDetailsModal(productId) {
-    showLoading();
-
+async function showProductDetails(id) {
+    showLoading(true);
     try {
-        const p = await fetchProductById(productId);
+        const p = await fetchJSON(`https://fakestoreapi.com/products/${id}`);
 
-        modalContent.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-gray-50 rounded-lg p-3">
-          <img src="${p.image}" alt="${escapeHtml(p.title)}" class="w-full h-64 object-contain" />
+        openModal(`
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-slate-100 rounded-xl p-6 flex items-center justify-center">
+          <img src="${p.image}" alt="${p.title}" class="max-h-64 object-contain" />
         </div>
 
         <div>
-          <h2 class="text-lg font-bold">${escapeHtml(p.title)}</h2>
-          <p class="text-sm text-gray-600 mt-2">${escapeHtml(p.description)}</p>
+          <h3 class="text-xl font-bold">${p.title}</h3>
+          <p class="mt-2 text-slate-600 text-sm">${p.description}</p>
 
           <div class="mt-4 flex items-center justify-between">
-            <p class="text-base font-bold">$${p.price}</p>
-            <p class="text-sm text-gray-700">Rating: ${p.rating?.rate ?? "N/A"}</p>
+            <p class="text-lg font-bold">$${p.price}</p>
+            <p class="text-slate-600 text-sm">
+              <span class="text-amber-500">★</span> ${p.rating?.rate ?? "N/A"} (${p.rating?.count ?? 0})
+            </p>
           </div>
 
           <button
-            class="modal-add-btn mt-4 w-full bg-black text-white rounded-lg px-4 py-2 text-sm hover:opacity-90"
-            data-id="${p.id}">
+            class="modal-add mt-5 w-full px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+            data-id="${p.id}"
+            type="button"
+          >
             Add to Cart
           </button>
         </div>
       </div>
-    `;
-
-        openModal();
+    `);
     } catch (err) {
+        openModal(`<p class="text-red-600">Failed to load product details</p>`);
         console.log(err);
-        modalContent.innerHTML = `<p class="text-red-600">Failed to load details</p>`;
-        openModal();
     } finally {
-        hideLoading();
+        showLoading(false);
     }
 }
 
-/* ----------------------------
-   Cart (LocalStorage)
----------------------------- */
-function loadCartFromStorage() {
-    try {
-        const raw = localStorage.getItem("swiftcart_cart");
-        return raw ? JSON.parse(raw) : [];
-    } catch {
-        return [];
+/*
+  One click handler for everything:
+  - category buttons
+  - details button
+  - add to cart button
+  - modal add button
+  This prevents duplicate listeners (the "2 then 4" bug).
+*/
+document.addEventListener("click", async (e) => {
+    const catBtn = e.target.closest(".cat-btn");
+    if (catBtn) {
+        const cat = catBtn.dataset.cat;
+        setActiveCategory(cat);
+        await loadProducts(cat);
+        return;
     }
-}
 
-function saveCartToStorage() {
-    localStorage.setItem("swiftcart_cart", JSON.stringify(cart));
-}
+    const detailsBtn = e.target.closest(".details-btn");
+    if (detailsBtn) {
+        const id = detailsBtn.dataset.id;
+        await showProductDetails(id);
+        return;
+    }
 
-function updateCartCount() {
-    if (!cartCountEl) return;
-    cartCountEl.textContent = String(cart.length);
-}
-
-function addToCart(product) {
-    cart.push(product);
-    saveCartToStorage();
-    updateCartCount();
-}
-
-/* ----------------------------
-   Event Delegation (Fixes 2,4,6 bug)
----------------------------- */
-function setupEventDelegation() {
-    // Category clicks
-    categoryContainer.addEventListener("click", async (e) => {
-        const btn = e.target.closest(".cat-btn");
-        if (!btn) return;
-
-        const category = btn.dataset.cat;
-        if (!category) return;
-
-        setActiveCategory(category);
-        await handleCategoryClick(category);
-    });
-
-    // Product grid clicks (details / add)
-    productGrid.addEventListener("click", (e) => {
-        const detailsBtn = e.target.closest(".details-btn");
-        const addBtn = e.target.closest(".add-btn");
-
-        if (detailsBtn) {
-            const id = Number(detailsBtn.dataset.id);
-            if (!Number.isNaN(id)) openDetailsModal(id);
-        }
-
-        if (addBtn) {
-            const id = Number(addBtn.dataset.id);
-            const product = currentProducts.find((x) => x.id === id);
-            if (product) addToCart(product);
-        }
-    });
-
-    // Modal add to cart
-    modal.addEventListener("click", (e) => {
-        const addBtn = e.target.closest(".modal-add-btn");
-        if (!addBtn) return;
-
+    const addBtn = e.target.closest(".add-btn");
+    if (addBtn) {
         const id = Number(addBtn.dataset.id);
-        if (Number.isNaN(id)) return;
-
-        fetchProductById(id)
-            .then((p) => addToCart(p))
-            .catch((err) => console.log(err));
-    });
-
-    // Close modal
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener("click", closeModal);
+        cart.push(id);
+        updateCartCount();
+        return;
     }
 
-    // Click outside modal content to close
-    modal.addEventListener("click", (e) => {
-        if (e.target === modal) closeModal();
-    });
+    const modalAdd = e.target.closest(".modal-add");
+    if (modalAdd) {
+        const id = Number(modalAdd.dataset.id);
+        cart.push(id);
+        updateCartCount();
+        hideModal();
+        return;
+    }
+});
 
-    // Esc to close
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && !modal.classList.contains("hidden")) {
-            closeModal();
-        }
-    });
-}
-
-/* ----------------------------
-   Helpers
----------------------------- */
-function escapeHtml(str) {
-    return String(str)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-/* ----------------------------
-   Init
----------------------------- */
-setupEventDelegation();
 loadCategories();
