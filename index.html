@@ -8,80 +8,141 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gray-50">
-
+<body class="bg-gray-50 text-gray-900">
     <!-- Navbar -->
-    <header class="bg-white shadow">
+    <header class="bg-white shadow sticky top-0 z-50">
         <nav class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
             <div class="text-xl font-bold">SwiftCart</div>
 
             <ul class="hidden md:flex gap-6 text-sm">
-                <li><a href="#home" class="hover:text-gray-600">Home</a></li>
-                <li><a href="#products" class="hover:text-gray-600">Products</a></li>
-                <li><a href="#about" class="hover:text-gray-600">About</a></li>
-                <li><a href="#contact" class="hover:text-gray-600">Contact</a></li>
+                <li><a class="hover:text-black/70" href="#home">Home</a></li>
+                <li><a class="hover:text-black/70" href="#products">Products</a></li>
+                <li><a class="hover:text-black/70" href="#about">About</a></li>
+                <li><a class="hover:text-black/70" href="#contact">Contact</a></li>
             </ul>
 
-            <button class="relative" type="button" aria-label="Cart">
+            <button id="cartBtn" class="relative border rounded-lg px-3 py-2 text-sm hover:bg-gray-100">
                 Cart
                 <span id="cartCount"
-                    class="absolute -top-2 -right-2 bg-black text-white text-xs px-2 py-0.5 rounded-full">
-                    0
-                </span>
+                    class="absolute -top-2 -right-2 bg-black text-white text-xs px-2 py-0.5 rounded-full">0</span>
             </button>
         </nav>
     </header>
 
-    <!-- Hero Section -->
+    <!-- Hero -->
     <section id="home" class="max-w-6xl mx-auto px-4 py-10">
         <div class="rounded-2xl p-10 bg-cover bg-center text-white"
             style="background-image:url('https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1600&q=60');">
-            <h1 class="text-3xl md:text-5xl font-bold">
-                Best Collection For You
-            </h1>
-            <p class="mt-3 max-w-xl">
-                Shop fashion, electronics, and more — fast and easy.
-            </p>
+            <h1 class="text-3xl md:text-5xl font-bold">Best Collection For You</h1>
+            <p class="mt-3 max-w-xl">Shop fashion, electronics, and more — fast and easy.</p>
             <a href="#products"
-                class="inline-block mt-6 bg-white text-black px-5 py-2 rounded-lg hover:bg-gray-200 transition">
-                Shop Now
-            </a>
+                class="inline-block mt-6 bg-white text-black px-5 py-2 rounded-lg hover:bg-gray-100">Shop Now</a>
         </div>
     </section>
 
-    <!-- Products Section -->
-    <section id="products" class="max-w-6xl mx-auto px-4 pb-16">
-        <h2 class="text-xl font-semibold mb-4">Categories</h2>
+    <!-- Why Choose Us -->
+    <section id="about" class="max-w-6xl mx-auto px-4 py-10">
+        <h2 class="text-2xl font-semibold mb-6">Why Choose Us</h2>
 
-        <!-- Categories -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white rounded-xl p-5 shadow">
+                <div class="text-sm font-semibold">Fast Delivery</div>
+                <p class="text-sm text-gray-600 mt-2">Get your items quickly with reliable delivery.</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-5 shadow">
+                <div class="text-sm font-semibold">Secure Payment</div>
+                <p class="text-sm text-gray-600 mt-2">Trusted payment methods for a safe checkout.</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-5 shadow">
+                <div class="text-sm font-semibold">24/7 Support</div>
+                <p class="text-sm text-gray-600 mt-2">We are here to help whenever you need us.</p>
+            </div>
+
+            <div class="bg-white rounded-xl p-5 shadow">
+                <div class="text-sm font-semibold">Best Quality</div>
+                <p class="text-sm text-gray-600 mt-2">Carefully selected products with great value.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products -->
+    <section id="products" class="max-w-6xl mx-auto px-4 pb-10">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+            <h2 class="text-2xl font-semibold">Products</h2>
+
+            <div class="flex items-center gap-2">
+                <input id="searchInput" type="text" placeholder="Search by title..."
+                    class="border rounded-lg px-3 py-2 text-sm w-56" />
+                <button id="clearSearchBtn" class="border rounded-lg px-3 py-2 text-sm hover:bg-gray-100" type="button">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-semibold mt-6 mb-3">Categories</h3>
         <div id="categoryContainer" class="flex flex-wrap gap-2 mb-6"></div>
 
-        <!-- Loading Spinner -->
-        <div id="loading" class="hidden text-center py-10">
-            <div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-black mx-auto">
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/20 items-center justify-center z-50">
+            <div class="bg-white rounded-xl p-5 shadow flex items-center gap-3">
+                <div class="h-5 w-5 rounded-full border-2 border-gray-300 border-t-black animate-spin"></div>
+                <div class="text-sm font-medium">Loading...</div>
             </div>
-            <p class="text-sm text-gray-600 mt-3">Loading...</p>
         </div>
 
+        <!-- Trending -->
+        <h3 class="text-lg font-semibold mt-2 mb-3">Trending</h3>
+        <div id="trendingGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"></div>
+
         <!-- Products Grid -->
-        <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+    </section>
+
+    <!-- Newsletter -->
+    <section id="contact" class="max-w-6xl mx-auto px-4 py-10">
+        <div class="bg-white rounded-2xl p-6 shadow flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div>
+                <h3 class="text-lg font-semibold">Newsletter</h3>
+                <p class="text-sm text-gray-600 mt-1">Get updates about new products and offers.</p>
+            </div>
+
+            <form id="newsletterForm" class="flex gap-2 w-full md:w-auto">
+                <input id="newsletterEmail" type="email" required placeholder="Enter your email"
+                    class="border rounded-lg px-3 py-2 text-sm w-full md:w-72" />
+                <button type="submit" class="bg-black text-white rounded-lg px-4 py-2 text-sm hover:bg-black/90">
+                    Subscribe
+                </button>
+            </form>
         </div>
     </section>
 
-    <!-- Product Modal -->
+    <!-- Footer -->
+    <footer class="border-t bg-white">
+        <div class="max-w-6xl mx-auto px-4 py-6 text-sm text-gray-600 flex flex-col md:flex-row gap-2 justify-between">
+            <div>© <span id="year"></span> SwiftCart. All rights reserved.</div>
+            <div class="flex gap-4">
+                <a class="hover:text-gray-900" href="#home">Home</a>
+                <a class="hover:text-gray-900" href="#products">Products</a>
+                <a class="hover:text-gray-900" href="#about">About</a>
+                <a class="hover:text-gray-900" href="#contact">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal (hidden by default) -->
     <div id="modal" class="hidden fixed inset-0 bg-black/50 items-center justify-center p-4 z-50">
-        <div class="bg-white max-w-xl w-full rounded-xl p-6 relative">
-
-            <button id="closeModal" class="absolute right-4 top-4 text-gray-600 hover:text-black text-lg">
-                ×
+        <div class="bg-white max-w-2xl w-full rounded-xl p-5 relative">
+            <button id="closeModal" class="absolute right-3 top-3 border rounded-lg px-2 py-1 text-sm hover:bg-gray-100"
+                type="button">
+                Close
             </button>
-
             <div id="modalContent"></div>
         </div>
     </div>
 
     <script src="script.js"></script>
-
 </body>
 
 </html>
