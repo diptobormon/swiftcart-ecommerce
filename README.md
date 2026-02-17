@@ -12,8 +12,9 @@ A dynamic e-commerce website is built by using:
 - Clean UI layout
 
 # Live Preview
-https://diptobormon.github.io/swiftcart-ecommerce/
+Live Link: https://diptobormon.github.io/swiftcart-ecommerce/
+GitHub Repository: https://github.com/diptobormon/swiftcart-ecommerce
 
 # Author
-Dipto Bormon
-Hamburg, Germany
+Dipto Bormon,
+Location:Hamburg, Germany
