@@ -2,249 +2,315 @@ console.log("script connected");
 
 const categoryContainer = document.getElementById("categoryContainer");
 const productGrid = document.getElementById("productGrid");
+const trendingGrid = document.getElementById("trendingGrid");
 const loading = document.getElementById("loading");
-
-const modal = document.getElementById("modal");
-const modalContent = document.getElementById("modalContent");
-const closeModal = document.getElementById("closeModal");
 
 const cartCountEl = document.getElementById("cartCount");
 
-let activeCategory = "all";
-let cart = [];
+const modal = document.getElementById("modal");
+const modalContent = document.getElementById("modalContent");
+const closeModalBtn = document.getElementById("closeModal");
 
-function showLoading(isLoading) {
-    if (isLoading) loading.classList.remove("hidden");
-    else loading.classList.add("hidden");
+let activeCategory = "all";
+let currentProducts = [];
+let cart = loadCartFromStorage();
+
+function loadCartFromStorage() {
+    try {
+        const raw = localStorage.getItem("swiftcart_cart");
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
 }
 
-function setActiveCategory(cat) {
-    activeCategory = cat;
-
-    document.querySelectorAll(".cat-btn").forEach((btn) => {
-        const isActive = btn.dataset.cat === cat;
-        btn.classList.toggle("bg-indigo-600", isActive);
-        btn.classList.toggle("text-white", isActive);
-        btn.classList.toggle("border-indigo-600", isActive);
-
-        btn.classList.toggle("bg-white", !isActive);
-        btn.classList.toggle("text-slate-700", !isActive);
-        btn.classList.toggle("border-slate-300", !isActive);
-    });
+function saveCartToStorage() {
+    localStorage.setItem("swiftcart_cart", JSON.stringify(cart));
 }
 
 function updateCartCount() {
     cartCountEl.textContent = String(cart.length);
 }
 
-function openModal(html) {
-    modalContent.innerHTML = html;
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
+function setLoading(isLoading) {
+    if (isLoading) loading.classList.remove("hidden");
+    else loading.classList.add("hidden");
 }
 
-function hideModal() {
-    modal.classList.add("hidden");
-    modal.classList.remove("flex");
+function normalizeCategoryLabel(cat) {
+    // match reference labels in UI
+    if (cat === "men's clothing") return "Men's Clothing";
+    if (cat === "women's clothing") return "Women's Clothing";
+    if (cat === "electronics") return "Electronics";
+    if (cat === "jewelery") return "Jewelery";
+    return cat;
 }
 
-closeModal.addEventListener("click", hideModal);
-modal.addEventListener("click", (e) => {
-    if (e.target === modal) hideModal();
-});
+function renderStars(rate) {
+    const r = typeof rate === "number" ? rate : 0;
+    const full = Math.floor(r);
+    const half = r - full >= 0.5 ? 1 : 0;
+    const empty = 5 - full - half;
 
-async function fetchJSON(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Request failed");
-    return res.json();
+    const fullStar = "★".repeat(full);
+    const halfStar = half ? "★" : "";
+    const emptyStar = "☆".repeat(empty);
+
+    return `<span class="text-yellow-500 text-sm">${fullStar}${halfStar}${emptyStar}</span>`;
 }
 
-function renderCategories(categories) {
-    const allCats = ["all", ...categories];
+function truncate(text, maxLen) {
+    if (!text) return "";
+    return text.length > maxLen ? text.slice(0, maxLen) + "..." : text;
+}
 
-    categoryContainer.innerHTML = allCats
+function setActiveCategoryButton() {
+    document.querySelectorAll("[data-category]").forEach((btn) => {
+        const cat = btn.getAttribute("data-category");
+        const isActive = cat === activeCategory;
+
+        btn.className =
+            "px-5 py-2 rounded-full text-sm border transition " +
+            (isActive
+                ? "bg-indigo-600 text-white border-indigo-600 shadow"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100");
+    });
+}
+
+function renderCategoryButtons(categories) {
+    // include "All" like reference design
+    const allBtn = `<button data-category="all" class="px-5 py-2 rounded-full text-sm border">All</button>`;
+
+    const btns = categories
         .map((cat) => {
-            const label = cat === "all" ? "All" : cat;
-            return `
-        <button
-          class="cat-btn px-5 py-2 rounded-full border text-sm transition"
-          data-cat="${cat}"
-          type="button"
-        >
-          ${label}
-        </button>
-      `;
+            return `<button data-category="${cat}" class="px-5 py-2 rounded-full text-sm border">
+        ${normalizeCategoryLabel(cat)}
+      </button>`;
         })
         .join("");
 
-    setActiveCategory("all");
+    categoryContainer.innerHTML = allBtn + btns;
+    setActiveCategoryButton();
+}
+
+function renderProductCard(p) {
+    return `
+    <div class="bg-white rounded-2xl p-4 shadow-soft border border-gray-100">
+      <div class="card-img-bg rounded-xl p-4 flex items-center justify-center">
+        <img src="${p.image}" alt="${p.title}" class="h-36 w-full object-contain" />
+      </div>
+
+      <div class="mt-3 flex items-center justify-between">
+        <span class="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600">
+          ${normalizeCategoryLabel(p.category)}
+        </span>
+        <span class="text-xs text-gray-500 flex items-center gap-1">
+          <span class="text-yellow-500">★</span>
+          ${p.rating?.rate ?? "N/A"} (${p.rating?.count ?? 0})
+        </span>
+      </div>
+
+      <h3 class="mt-2 font-semibold text-sm">${truncate(p.title, 26)}</h3>
+      <p class="mt-1 font-bold">$${p.price}</p>
+
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button
+          class="detail-btn w-full px-3 py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-100"
+          data-id="${p.id}"
+          type="button"
+        >
+          Details
+        </button>
+
+        <button
+          class="add-btn w-full px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
+          data-id="${p.id}"
+          type="button"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 function renderProducts(products) {
-    productGrid.innerHTML = products
-        .map((p) => {
-            const title = p.title.length > 24 ? p.title.slice(0, 24) + "..." : p.title;
-            const rating = p.rating?.rate ?? "N/A";
-            const count = p.rating?.count ?? 0;
-
-            return `
-        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition">
-          <div class="bg-slate-100 p-6 flex items-center justify-center h-56">
-            <img src="${p.image}" alt="${p.title}" class="max-h-40 w-auto object-contain" />
-          </div>
-
-          <div class="p-4">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">
-                ${p.category}
-              </span>
-
-              <span class="text-sm text-slate-600">
-                <span class="text-amber-500">★</span> ${rating} <span class="text-xs">(${count})</span>
-              </span>
-            </div>
-
-            <h3 class="mt-3 font-semibold text-slate-900 leading-snug">${title}</h3>
-            <p class="mt-2 font-bold text-slate-900">$${p.price}</p>
-
-            <div class="mt-4 flex gap-2">
-              <button
-                class="details-btn flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm hover:bg-slate-100"
-                data-id="${p.id}"
-                type="button"
-              >
-                Details
-              </button>
-
-              <button
-                class="add-btn flex-1 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
-                data-id="${p.id}"
-                type="button"
-              >
-                Add to Cart
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-        })
-        .join("");
+    currentProducts = products;
+    productGrid.innerHTML = products.map(renderProductCard).join("");
 }
 
 async function loadCategories() {
-    showLoading(true);
     try {
-        const categories = await fetchJSON("https://fakestoreapi.com/products/categories");
-        renderCategories(categories);
-        await loadProducts("all");
+        const res = await fetch("https://fakestoreapi.com/products/categories");
+        const categories = await res.json();
+        renderCategoryButtons(categories);
     } catch (err) {
-        categoryContainer.innerHTML = `<p class="text-red-600 text-center w-full">Failed to load categories</p>`;
+        categoryContainer.innerHTML = `<p class="text-red-600">Failed to load categories</p>`;
         console.log(err);
-    } finally {
-        showLoading(false);
     }
 }
 
-async function loadProducts(category) {
-    showLoading(true);
-    productGrid.innerHTML = "";
-
+async function loadAllProducts() {
+    setLoading(true);
     try {
-        const url =
-            category === "all"
-                ? "https://fakestoreapi.com/products"
-                : `https://fakestoreapi.com/products/category/${encodeURIComponent(category)}`;
-
-        const products = await fetchJSON(url);
+        const res = await fetch("https://fakestoreapi.com/products");
+        const products = await res.json();
         renderProducts(products);
     } catch (err) {
         productGrid.innerHTML = `<p class="text-red-600">Failed to load products</p>`;
         console.log(err);
     } finally {
-        showLoading(false);
+        setLoading(false);
     }
 }
 
-async function showProductDetails(id) {
-    showLoading(true);
+async function loadProductsByCategory(category) {
+    setLoading(true);
     try {
-        const p = await fetchJSON(`https://fakestoreapi.com/products/${id}`);
+        const url = `https://fakestoreapi.com/products/category/${encodeURIComponent(category)}`;
+        const res = await fetch(url);
+        const products = await res.json();
+        renderProducts(products);
+    } catch (err) {
+        productGrid.innerHTML = `<p class="text-red-600">Failed to load products</p>`;
+        console.log(err);
+    } finally {
+        setLoading(false);
+    }
+}
 
-        openModal(`
+async function loadTrending() {
+    try {
+        const res = await fetch("https://fakestoreapi.com/products");
+        const products = await res.json();
+
+        // sort by rating desc, take top 3
+        const top3 = [...products]
+            .sort((a, b) => (b.rating?.rate ?? 0) - (a.rating?.rate ?? 0))
+            .slice(0, 3);
+
+        trendingGrid.innerHTML = top3.map(renderProductCard).join("");
+    } catch (err) {
+        trendingGrid.innerHTML = `<p class="text-red-600">Failed to load trending products</p>`;
+        console.log(err);
+    }
+}
+
+async function openProductModal(productId) {
+    try {
+        setLoading(true);
+        const res = await fetch(`https://fakestoreapi.com/products/${productId}`);
+        const p = await res.json();
+
+        modalContent.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-slate-100 rounded-xl p-6 flex items-center justify-center">
-          <img src="${p.image}" alt="${p.title}" class="max-h-64 object-contain" />
+        <div class="bg-indigo-50 rounded-xl p-5 flex items-center justify-center">
+          <img src="${p.image}" alt="${p.title}" class="h-64 w-full object-contain" />
         </div>
 
         <div>
-          <h3 class="text-xl font-bold">${p.title}</h3>
-          <p class="mt-2 text-slate-600 text-sm">${p.description}</p>
+          <span class="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-600">
+            ${normalizeCategoryLabel(p.category)}
+          </span>
 
-          <div class="mt-4 flex items-center justify-between">
+          <h3 class="mt-3 text-xl font-bold">${p.title}</h3>
+
+          <div class="mt-2 flex items-center justify-between">
             <p class="text-lg font-bold">$${p.price}</p>
-            <p class="text-slate-600 text-sm">
-              <span class="text-amber-500">★</span> ${p.rating?.rate ?? "N/A"} (${p.rating?.count ?? 0})
-            </p>
+            <div class="text-sm">
+              ${renderStars(p.rating?.rate)}
+              <span class="text-gray-500 ml-2">${p.rating?.rate ?? "N/A"} (${p.rating?.count ?? 0})</span>
+            </div>
           </div>
 
-          <button
-            class="modal-add mt-5 w-full px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-            data-id="${p.id}"
-            type="button"
-          >
-            Add to Cart
-          </button>
+          <p class="mt-3 text-sm text-gray-600 leading-relaxed">${p.description}</p>
+
+          <div class="mt-5 flex gap-2">
+            <button
+              class="add-btn px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
+              data-id="${p.id}"
+              type="button"
+            >
+              Add to Cart
+            </button>
+
+            <button
+              class="px-4 py-2 rounded-lg border border-gray-200 text-sm hover:bg-gray-100"
+              type="button"
+              id="buyNowBtn"
+            >
+              Buy Now
+            </button>
+          </div>
         </div>
       </div>
-    `);
+    `;
+
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
     } catch (err) {
-        openModal(`<p class="text-red-600">Failed to load product details</p>`);
         console.log(err);
     } finally {
-        showLoading(false);
+        setLoading(false);
     }
 }
 
-/*
-  One click handler for everything:
-  - category buttons
-  - details button
-  - add to cart button
-  - modal add button
-  This prevents duplicate listeners (the "2 then 4" bug).
-*/
-document.addEventListener("click", async (e) => {
-    const catBtn = e.target.closest(".cat-btn");
-    if (catBtn) {
-        const cat = catBtn.dataset.cat;
-        setActiveCategory(cat);
-        await loadProducts(cat);
-        return;
-    }
+function closeModal() {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+}
 
-    const detailsBtn = e.target.closest(".details-btn");
-    if (detailsBtn) {
-        const id = detailsBtn.dataset.id;
-        await showProductDetails(id);
-        return;
-    }
+function addToCart(productId) {
+    // add once per click (no duplicate listeners now)
+    cart.push({ id: Number(productId), addedAt: Date.now() });
+    saveCartToStorage();
+    updateCartCount();
+}
 
+/* -------------------------
+   Single event listeners
+   (prevents double add bug)
+-------------------------- */
+
+// Category click (event delegation)
+categoryContainer.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-category]");
+    if (!btn) return;
+
+    activeCategory = btn.getAttribute("data-category");
+    setActiveCategoryButton();
+
+    if (activeCategory === "all") loadAllProducts();
+    else loadProductsByCategory(activeCategory);
+});
+
+// Product grid click (details/add) - event delegation
+document.addEventListener("click", (e) => {
+    const detailBtn = e.target.closest(".detail-btn");
     const addBtn = e.target.closest(".add-btn");
-    if (addBtn) {
-        const id = Number(addBtn.dataset.id);
-        cart.push(id);
-        updateCartCount();
+
+    if (detailBtn) {
+        const id = detailBtn.getAttribute("data-id");
+        openProductModal(id);
         return;
     }
 
-    const modalAdd = e.target.closest(".modal-add");
-    if (modalAdd) {
-        const id = Number(modalAdd.dataset.id);
-        cart.push(id);
-        updateCartCount();
-        hideModal();
-        return;
+    if (addBtn) {
+        const id = addBtn.getAttribute("data-id");
+        addToCart(id);
     }
 });
 
+// Modal close
+closeModalBtn.addEventListener("click", closeModal);
+modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+});
+
+/* -------------------------
+   Init
+-------------------------- */
+updateCartCount();
 loadCategories();
+loadTrending();
+loadAllProducts();
